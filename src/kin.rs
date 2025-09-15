@@ -9,11 +9,15 @@ const SEGMENT_COLOR: Color = Color::Srgba(css::LIGHT_CYAN);
 const DRAW_CHAIN_GIZMOS: bool = false;
 const DRAW_ORIENTATION_GIZMOS: bool = false;
 
+use crate::leg::IkLegPlugin;
+
 pub struct IkPlugin;
 
 impl Plugin for IkPlugin {
     fn build(&self, app: &mut App) {
-        
+        app
+            .add_plugins(IkLegPlugin)
+            .add_systems(Update, draw_ik_chain_gizmos);
     }
 }
 
@@ -62,7 +66,7 @@ pub struct ChainSegment {
     pub length: f32 
 }
 
-fn solve_chain_towards_target(
+pub fn solve_chain_towards_target(
     chain: &mut IkChain,
     target: Vec3,
     iterations: i32,
