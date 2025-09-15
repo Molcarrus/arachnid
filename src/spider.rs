@@ -115,7 +115,7 @@ fn spawn_spider_legs (
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>
 ) {
-    let mesh = meshes.add(Cuboid::new(0.2, 0.2, 0.2));
+    let mesh = meshes.add(Cuboid::new(0.2, 0.2, 3.2));
 
     let material = materials.add(StandardMaterial {
         base_color: LEGS_COLOR,

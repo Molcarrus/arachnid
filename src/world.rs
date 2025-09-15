@@ -22,15 +22,15 @@ fn spawn(
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::from_length(2.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::Srgba(Srgba::rgb_u8(255, 165, 0)), 
-            perceptual_roughness: 1.0,        
-            ..default()
-        })),
-        Transform::from_xyz(0.0, 1.0, 0.0)
-    ));
+    // commands.spawn((
+    //     Mesh3d(meshes.add(Cuboid::from_length(2.0))),
+    //     MeshMaterial3d(materials.add(StandardMaterial {
+    //         base_color: Color::Srgba(Srgba::rgb_u8(255, 165, 0)), 
+    //         perceptual_roughness: 1.0,        
+    //         ..default()
+    //     })),
+    //     Transform::from_xyz(0.0, 1.0, 0.0)
+    // ));
 
     commands.spawn((
         DirectionalLight {
