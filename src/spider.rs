@@ -1,10 +1,11 @@
-use bevy::{color::palettes::css, input::keyboard::{Key, KeyboardInput}, picking::PickSet, prelude::*};
-
-use crate::{
-    kin::IkChain,
-    leg::AnimatedLeg,
-    rotations
+use bevy::{
+    color::palettes::css,
+    input::keyboard::{Key, KeyboardInput},
+    picking::PickSet,
+    prelude::*,
 };
+
+use crate::{kin::IkChain, leg::AnimatedLeg, rotations};
 
 const SPAWN_POSITION: Vec3 = Vec3::new(-2.0, 1.0, 2.0);
 const MOVE_SPEED: f32 = 6.0;
@@ -19,13 +20,13 @@ pub struct SpiderPlugin;
 
 impl Plugin for SpiderPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(Startup, spawn_spider)
-            .add_systems(Update, (
+        app.add_systems(Startup, spawn_spider).add_systems(
+            Update,
+            (
                 move_from_input,
                 update_leg_error,
                 retarget_if_threshold_reached,
-                position_leg_pieces_on_chain
+                position_leg_pieces_on_chain,
             ),
         );
     }
@@ -34,60 +35,56 @@ impl Plugin for SpiderPlugin {
 #[derive(Component)]
 pub struct Spider {
     combined_leg_position_error: f32,
-    movement_group: u8 
+    movement_group: u8,
 }
 
 impl Spider {
     fn switch_movement_group(&mut self) {
         self.movement_group = match self.movement_group {
             1 => 2,
-            _ => 1
+            _ => 1,
         };
     }
 }
 
 #[derive(Component)]
 struct SpiderLeg {
-    movement_group: u8 
+    movement_group: u8,
 }
 
 struct LegSpawnInfo {
     position_offset: Vec3,
     angle_offset: f32,
-    movement_group: u8 
+    movement_group: u8,
 }
 
 impl LegSpawnInfo {
-    fn new(
-        pos: Vec3,
-        angle: f32,
-        group: u8 
-    ) -> Self {
+    fn new(pos: Vec3, angle: f32, group: u8) -> Self {
         LegSpawnInfo {
             position_offset: pos,
             angle_offset: angle,
-            movement_group: group
+            movement_group: group,
         }
     }
 }
 
 #[derive(Component)]
 struct LegPiece {
-    index_in_chains: u8 
+    index_in_chains: u8,
 }
 
 impl LegPiece {
     fn new(position_in_chain: u8) -> Self {
         Self {
-            index_in_chains: position_in_chain
+            index_in_chains: position_in_chain,
         }
     }
 }
 
 fn spawn_spider(
-    mut commands: Commands,  
+    mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mesh = meshes.add(Cuboid::new(1.4, 0.8, 1.8));
 
@@ -102,7 +99,7 @@ fn spawn_spider(
             Spider {
                 combined_leg_position_error: 0.0,
                 movement_group: 2,
-            }, 
+            },
             Transform::from_translation(SPAWN_POSITION),
             Mesh3d(mesh),
             MeshMaterial3d(material),
@@ -110,10 +107,10 @@ fn spawn_spider(
         .with_children(|spider| spawn_spider_legs(spider, &mut meshes, &mut materials));
 }
 
-fn spawn_spider_legs (
+fn spawn_spider_legs(
     spider: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>
+    materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
     let mesh = meshes.add(Cuboid::new(0.2, 0.2, 3.2));
 
@@ -126,7 +123,7 @@ fn spawn_spider_legs (
     let base_points = vec![
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(1.0, 3.0, 0.0),
-        Vec3::new(2.0, 0.0, 0.0)
+        Vec3::new(2.0, 0.0, 0.0),
     ];
 
     let legs_data = [
@@ -158,21 +155,21 @@ fn spawn_spider_legs (
                     movement_group: data.movement_group,
                 },
                 Transform::default(),
-                Visibility::default()
+                Visibility::default(),
             ))
             .with_children(|chain| {
                 chain.spawn((
                     Transform::from_translation(SPAWN_POSITION),
                     Mesh3d(mesh.clone()),
                     MeshMaterial3d(material.clone()),
-                    LegPiece::new(0)
+                    LegPiece::new(0),
                 ));
 
                 chain.spawn((
                     Transform::from_translation(SPAWN_POSITION),
                     Mesh3d(mesh.clone()),
                     MeshMaterial3d(material.clone()),
-                    LegPiece::new(1)
+                    LegPiece::new(1),
                 ));
             });
     }
@@ -182,7 +179,7 @@ fn move_from_input(
     mut spider: Query<(&mut Transform, &Children), With<Spider>>,
     mut spider_legs: Query<&mut IkChain, With<SpiderLeg>>,
     input: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>
+    time: Res<Time>,
 ) {
     let (mut transform, children) = spider.single_mut().unwrap();
 
@@ -222,7 +219,7 @@ fn get_wasd_input_as_vec(input: &Res<ButtonInput<KeyCode>>) -> Vec3 {
 
 fn update_leg_error(
     mut spider: Query<(&mut Spider, &Children)>,
-    spider_legs: Query<(&IkChain, &AnimatedLeg), With<SpiderLeg>>
+    spider_legs: Query<(&IkChain, &AnimatedLeg), With<SpiderLeg>>,
 ) {
     let (mut spider, children) = spider.single_mut().unwrap();
 
@@ -238,7 +235,7 @@ fn update_leg_error(
 
 fn retarget_if_threshold_reached(
     mut spider: Query<(&mut Spider, &Children)>,
-    mut spider_legs: Query<(&IkChain, &mut AnimatedLeg, &SpiderLeg)>
+    mut spider_legs: Query<(&IkChain, &mut AnimatedLeg, &SpiderLeg)>,
 ) {
     let (mut spider, children) = spider.single_mut().unwrap();
 
@@ -258,7 +255,7 @@ fn retarget_if_threshold_reached(
 
 fn position_leg_pieces_on_chain(
     spider_legs: Query<(&IkChain, &GlobalTransform, &Children), With<SpiderLeg>>,
-    mut leg_pieces: Query<(&LegPiece, &mut Transform)>
+    mut leg_pieces: Query<(&LegPiece, &mut Transform)>,
 ) {
     for (chain, global_transform, children) in spider_legs.iter() {
         for child_id in children.iter() {

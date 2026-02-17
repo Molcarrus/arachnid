@@ -1,26 +1,26 @@
-mod rotations;
-mod world;
+mod camera;
 mod kin;
 mod leg;
+mod rotations;
 mod spider;
-mod camera;
 mod terrain;
+mod world;
 
 use bevy::prelude::*;
 
 use camera::CameraPlugin;
 use kin::IkPlugin;
 use spider::SpiderPlugin;
-use world::WorldPlugin;
 use terrain::TerrainPlugin;
+use world::WorldPlugin;
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins, 
-            CameraPlugin, 
-            WorldPlugin, 
-            IkPlugin, 
+            DefaultPlugins,
+            CameraPlugin,
+            WorldPlugin,
+            IkPlugin,
             SpiderPlugin,
             TerrainPlugin,
         ))

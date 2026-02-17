@@ -15,8 +15,7 @@ pub struct IkPlugin;
 
 impl Plugin for IkPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_plugins(IkLegPlugin)
+        app.add_plugins(IkLegPlugin)
             .add_systems(Update, draw_ik_chain_gizmos);
     }
 }
@@ -25,13 +24,16 @@ impl Plugin for IkPlugin {
 pub struct IkChain {
     pub start: Vec3,
     points: Vec<Vec3>,
-    lengths: Vec<f32>
+    lengths: Vec<f32>,
 }
 
 impl IkChain {
     pub fn new(points: Vec<Vec3>) -> Self {
         if points.len() < 2 {
-            panic!("Invalid vector! IK chain can't be made from {} points", points.len());
+            panic!(
+                "Invalid vector! IK chain can't be made from {} points",
+                points.len()
+            );
         }
 
         let lengths = calculate_chain_lengths(&points);
@@ -39,19 +41,23 @@ impl IkChain {
         Self {
             start: points[0],
             points,
-            lengths
+            lengths,
         }
     }
 
     pub fn get_segment(&self, idx: usize) -> ChainSegment {
         if idx >= self.points.len() - 1 {
-            panic!("Invalid index! `get_segment` called with index: {}, but only {} points", idx, self.points.len());
+            panic!(
+                "Invalid index! `get_segment` called with index: {}, but only {} points",
+                idx,
+                self.points.len()
+            );
         }
 
         ChainSegment {
             start: self.points[idx],
             end: self.points[idx + 1],
-            length: self.lengths[idx]
+            length: self.lengths[idx],
         }
     }
 
@@ -63,14 +69,14 @@ impl IkChain {
 pub struct ChainSegment {
     pub start: Vec3,
     pub end: Vec3,
-    pub length: f32 
+    pub length: f32,
 }
 
 pub fn solve_chain_towards_target(
     chain: &mut IkChain,
     target: Vec3,
     iterations: i32,
-    gizmos: &mut Gizmos 
+    gizmos: &mut Gizmos,
 ) {
     for _ in 0..iterations {
         backward_fabric_pass(chain, target);
@@ -88,14 +94,11 @@ fn forward_fabric_pass(chain: &mut IkChain) {
         let segment = chain.get_segment(i);
         let direction = (segment.end - segment.start).normalize_or_zero();
 
-        chain.points[i+1] = segment.start + direction * segment.length;
+        chain.points[i + 1] = segment.start + direction * segment.length;
     }
 }
 
-fn backward_fabric_pass(
-    chain: &mut IkChain, 
-    target: Vec3
-) {
+fn backward_fabric_pass(chain: &mut IkChain, target: Vec3) {
     let points_count = chain.points.len();
 
     chain.points[points_count - 1] = target;
@@ -108,10 +111,7 @@ fn backward_fabric_pass(
     }
 }
 
-fn constrain_chain_orientation(
-    chain: &mut IkChain,
-    gizmos: &mut Gizmos 
-) {
+fn constrain_chain_orientation(chain: &mut IkChain, gizmos: &mut Gizmos) {
     let first_point = chain.points[0];
     let last_point = chain.points[chain.points.len() - 1];
     let leg_orientation = rotations::looking_at(first_point, last_point, Vec3::Y);
@@ -153,10 +153,7 @@ fn calculate_chain_lengths(points: &Vec<Vec3>) -> Vec<f32> {
     lengths
 }
 
-fn draw_ik_chain_gizmos(
-    mut gizmos: Gizmos, 
-    ik_chains: Query<&IkChain>
-) {
+fn draw_ik_chain_gizmos(mut gizmos: Gizmos, ik_chains: Query<&IkChain>) {
     if DRAW_CHAIN_GIZMOS {
         for chain in ik_chains.iter() {
             for point in chain.points.iter() {
@@ -171,11 +168,7 @@ fn draw_ik_chain_gizmos(
     }
 }
 
-fn draw_orientation_gizmos(
-    gizmos: &mut Gizmos, 
-    position: Vec3,
-    orientation: Quat 
-) {
+fn draw_orientation_gizmos(gizmos: &mut Gizmos, position: Vec3, orientation: Quat) {
     gizmos.ray(position, orientation * Vec3::X, Color::Srgba(css::GREEN));
     gizmos.ray(position, orientation * Vec3::Y, Color::Srgba(css::RED));
     gizmos.ray(position, orientation * Vec3::Z, Color::Srgba(css::BLUE));

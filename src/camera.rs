@@ -1,9 +1,6 @@
 use bevy::{math::VectorSpace, prelude::*};
 
-use crate::{
-    spider::Spider,
-    rotations
-};
+use crate::{rotations, spider::Spider};
 
 const FOLLOW_DISTANCE: f32 = 10.0;
 const SPAWN_POSITION: Vec3 = Vec3::new(0.0, 6.0, 10.0);
@@ -15,13 +12,13 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(Startup, spawn_camera)
-            .add_systems(Update, (
+        app.add_systems(Startup, spawn_camera).add_systems(
+            Update,
+            (
                 (update_target_position, update_target_rotation),
-                (move_towards_spider, rotate_towards_spider)
+                (move_towards_spider, rotate_towards_spider),
             )
-            .chain()
+                .chain(),
         );
     }
 }
@@ -29,14 +26,14 @@ impl Plugin for CameraPlugin {
 #[derive(Component)]
 struct SpiderCamera {
     target_position: Vec3,
-    target_rotation: Quat 
+    target_rotation: Quat,
 }
 
 impl SpiderCamera {
     fn new(position: Vec3, rotation: Quat) -> Self {
         SpiderCamera {
             target_position: position,
-            target_rotation: rotation
+            target_rotation: rotation,
         }
     }
 }
@@ -47,18 +44,19 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_translation(SPAWN_POSITION).with_rotation(spawn_rotation),
-        SpiderCamera::new(SPAWN_POSITION, spawn_rotation)
+        SpiderCamera::new(SPAWN_POSITION, spawn_rotation),
     ));
 }
 
 fn update_target_position(
     mut spider_camera: Query<(&mut SpiderCamera, &Transform)>,
-    spider: Query<&Transform, (With<Spider>, Without<SpiderCamera>)>
+    spider: Query<&Transform, (With<Spider>, Without<SpiderCamera>)>,
 ) {
     let (mut camera, camera_transform) = spider_camera.single_mut().unwrap();
     let spider = spider.single().unwrap();
 
-    let flat_delta_position = get_flat_delta_position(spider.translation, camera_transform.translation);
+    let flat_delta_position =
+        get_flat_delta_position(spider.translation, camera_transform.translation);
     let direction = flat_delta_position.normalize_or_zero();
 
     let mut new_position = spider.translation + direction * FOLLOW_DISTANCE;
@@ -69,12 +67,13 @@ fn update_target_position(
 
 fn update_target_rotation(
     mut spider_camera: Query<(&mut SpiderCamera, &Transform)>,
-    spider: Query<&Transform, (With<Spider>, Without<SpiderCamera>)>
+    spider: Query<&Transform, (With<Spider>, Without<SpiderCamera>)>,
 ) {
     let (mut camera, camera_transform) = spider_camera.single_mut().unwrap();
     let spider = spider.single().unwrap();
 
-    let target_rotation = rotations::looking_at(camera_transform.translation, spider.translation, Vec3::Y);
+    let target_rotation =
+        rotations::looking_at(camera_transform.translation, spider.translation, Vec3::Y);
     camera.target_rotation = target_rotation;
 }
 
@@ -104,6 +103,6 @@ fn flatten_vector(vector: Vec3) -> Vec3 {
     Vec3 {
         x: vector.x,
         y: 0.0,
-        z: vector.z
+        z: vector.z,
     }
 }
