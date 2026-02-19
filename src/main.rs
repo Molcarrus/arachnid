@@ -5,6 +5,7 @@ mod rotations;
 mod spider;
 mod terrain;
 mod world;
+mod ui;
 
 use bevy::prelude::*;
 

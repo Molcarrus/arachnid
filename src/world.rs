@@ -8,30 +8,7 @@ impl Plugin for WorldPlugin {
     }
 }
 
-fn spawn(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(200.0, 0.2, 200.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::Srgba(Srgba::rgb_u8(137, 137, 137)),
-            ..default()
-        })),
-        Transform::from_xyz(0.0, 0.0, 0.0),
-    ));
-
-    // commands.spawn((
-    //     Mesh3d(meshes.add(Cuboid::from_length(2.0))),
-    //     MeshMaterial3d(materials.add(StandardMaterial {
-    //         base_color: Color::Srgba(Srgba::rgb_u8(255, 165, 0)),
-    //         perceptual_roughness: 1.0,
-    //         ..default()
-    //     })),
-    //     Transform::from_xyz(0.0, 1.0, 0.0)
-    // ));
-
+fn spawn(mut commands: Commands) {
     commands.spawn((
         DirectionalLight {
             shadows_enabled: true,

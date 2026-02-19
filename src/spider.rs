@@ -1,11 +1,9 @@
 use bevy::{
     color::palettes::css,
-    input::keyboard::{Key, KeyboardInput},
-    picking::PickSet,
-    prelude::*,
+    prelude::*, transform,
 };
 
-use crate::{kin::IkChain, leg::AnimatedLeg, rotations};
+use crate::{kin::IkChain, leg::AnimatedLeg, rotations, terrain::TerrainColliderCache};
 
 const SPAWN_POSITION: Vec3 = Vec3::new(-2.0, 1.0, 2.0);
 const MOVE_SPEED: f32 = 6.0;
@@ -16,6 +14,9 @@ const LEG_ERROR_THRESHOLD: f32 = 12.0;
 const BODY_COLOR: Color = Color::Srgba(css::BLACK);
 const LEGS_COLOR: Color = Color::Srgba(css::DARK_GRAY);
 
+const BODY_HEIGHT_OFFSET: f32 = 1.5;
+const BODY_HEIGHT_LERP: f32 = 0.1;
+
 pub struct SpiderPlugin;
 
 impl Plugin for SpiderPlugin {
@@ -24,9 +25,12 @@ impl Plugin for SpiderPlugin {
             Update,
             (
                 move_from_input,
+                adjust_body_height,
                 update_leg_error,
                 retarget_if_threshold_reached,
+                retarget_legs_to_terrain,
                 position_leg_pieces_on_chain,
+                apply_appearance_changes,
             ),
         );
     }
@@ -46,6 +50,49 @@ impl Spider {
         };
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpiderShapeType {
+    Box,
+    Sphere,
+    Flat,
+    Long,
+}
+
+#[derive(Clone)]
+pub struct SpiderColorConfig {
+    pub body_color: Color,
+    pub leg_color: Color,
+}
+
+impl Default for SpiderColorConfig {
+    fn default() -> Self {
+        Self { 
+            body_color: Color::BLACK, 
+            leg_color: Color::srgb(0.25, 0.25, 0.25) 
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct SpiderAppearance {
+    pub shape: SpiderShapeType,
+    pub color_config: SpiderColorConfig,
+    pub dirty: bool,
+}
+
+impl Default for SpiderAppearance {
+    fn default() -> Self {
+        Self { 
+            shape: SpiderShapeType::Box, 
+            color_config: SpiderColorConfig::default(), 
+            dirty: false 
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct SpiderBody;
 
 #[derive(Component)]
 struct SpiderLeg {
@@ -81,15 +128,25 @@ impl LegPiece {
     }
 }
 
+fn get_body_mesh(shape: SpiderShapeType) -> Mesh {
+    match shape {
+        SpiderShapeType::Box => Cuboid::new(1.4, 0.8, 1.8).into(),
+        SpiderShapeType::Sphere => Sphere::new(0.9).into(),
+        SpiderShapeType::Flat => Cuboid::new(2.0, 0.4, 2.2).into(),
+        SpiderShapeType::Long => Cuboid::new(1.0, 0.6, 2.8).into(),
+    }
+}
+
 fn spawn_spider(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mesh = meshes.add(Cuboid::new(1.4, 0.8, 1.8));
-
+    let appearance = SpiderAppearance::default();
+    
+    let mesh = meshes.add(get_body_mesh(appearance.shape));
     let material = materials.add(StandardMaterial {
-        base_color: BODY_COLOR,
+        base_color: appearance.color_config.body_color,
         perceptual_roughness: 1.0,
         ..default()
     });
@@ -103,6 +160,7 @@ fn spawn_spider(
             Transform::from_translation(SPAWN_POSITION),
             Mesh3d(mesh),
             MeshMaterial3d(material),
+            SpiderBody
         ))
         .with_children(|spider| spawn_spider_legs(spider, &mut meshes, &mut materials));
 }
@@ -195,6 +253,19 @@ fn move_from_input(
     }
 }
 
+fn adjust_body_height(
+    mut spider: Query<&mut Transform, With<Spider>>,
+    terrain_cache: Option<Res<TerrainColliderCache>>,
+) {
+    let Some(cache) = terrain_cache else { return };
+    let mut transform = spider.single_mut().unwrap();
+    
+    let terrain_height = cache.sample_height(transform.translation.x, transform.translation.z);
+    let target_y = terrain_height + BODY_HEIGHT_OFFSET;
+    
+    transform.translation.y = transform.translation.y + (target_y - transform.translation.y) * BODY_HEIGHT_LERP;
+}
+
 fn get_wasd_input_as_vec(input: &Res<ButtonInput<KeyCode>>) -> Vec3 {
     let mut result = Vec3::ZERO;
 
@@ -253,23 +324,83 @@ fn retarget_if_threshold_reached(
     }
 }
 
+fn retarget_legs_to_terrain(
+    spider: Query<&Children, With<Spider>>,
+    mut spider_legs: Query<(&IkChain, &mut AnimatedLeg, &SpiderLeg)>,
+    terrain_cache: Option<Res<TerrainColliderCache>>,
+) {
+    let Some(cache) = terrain_cache else { return };
+    let children = spider.single().unwrap();
+    
+    for child_id in children.iter() {
+        if let Ok((_chain, mut leg, _spider_leg)) = spider_legs.get_mut(child_id) {
+            if leg.lerp_fraction >= 1.0 {
+                let terrain_h = cache.sample_height(leg.current_target.x, leg.current_target.z);
+                leg.current_target.y = terrain_h;
+            }
+        }
+    }
+}
+
 fn position_leg_pieces_on_chain(
     spider_legs: Query<(&IkChain, &GlobalTransform, &Children), With<SpiderLeg>>,
-    mut leg_pieces: Query<(&LegPiece, &mut Transform)>,
+    mut leg_pieces: Query<(&LegPiece, &mut Transform)>
 ) {
     for (chain, global_transform, children) in spider_legs.iter() {
         for child_id in children.iter() {
             if let Ok((leg, mut transform)) = leg_pieces.get_mut(child_id) {
                 let segment = chain.get_segment(leg.index_in_chains as usize);
-
+                
                 let segment_direction = (segment.end - segment.start).normalize_or_zero();
                 let segment_orientation = rotations::looking_towards(segment_direction, Vec3::Y);
                 let segment_middle = segment.start + segment_direction * segment.length / 2.0;
-
+                
                 let local_position = segment_middle - global_transform.translation();
-
+                
                 transform.translation = local_position;
                 transform.rotation = segment_orientation;
+            }
+        }
+    }
+}
+
+fn apply_appearance_changes(
+    mut spider: Query<(&mut SpiderAppearance, &mut Mesh3d, &mut MeshMaterial3d<StandardMaterial>, &Children), With<Spider>>,
+    leg_pieces: Query<&MeshMaterial3d<StandardMaterial>, (With<LegPiece>, Without<Spider>)>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    children_query: Query<&Children, With<SpiderLeg>>,
+    spider_legs: Query<Entity, With<SpiderLeg>>,
+    mut all_leg_materials: Query<&mut MeshMaterial3d<StandardMaterial>, (With<LegPiece>, Without<Spider>)>,
+) {
+    let Ok((mut appearance, mut mesh, mut material, spider_children)) = spider.single_mut() else { return; };
+    
+    if !appearance.dirty {
+        return;
+    }
+    
+    appearance.dirty = false;
+    
+    *mesh = Mesh3d(meshes.add(get_body_mesh(appearance.shape)));
+    
+    *material = MeshMaterial3d(materials.add(StandardMaterial {
+        base_color: appearance.color_config.body_color,
+        perceptual_roughness: 1.0,
+        ..default()
+    }));
+    
+    let leg_mat = materials.add(StandardMaterial {
+        base_color: appearance.color_config.leg_color,
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    
+    for spider_child in spider_children.iter() {
+        if let Ok(leg_children) = children_query.get(spider_child) {
+            for leg_child in leg_children.iter() {
+                if let Ok(mut leg_material) = all_leg_materials.get_mut(leg_child) {
+                    *leg_material = MeshMaterial3d(leg_mat.clone());
+                }
             }
         }
     }

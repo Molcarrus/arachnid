@@ -7,6 +7,7 @@ const SPAWN_POSITION: Vec3 = Vec3::new(0.0, 6.0, 10.0);
 
 const MOVE_LERP_VALUE: f32 = 0.05;
 const ROTATE_LERP_VALUE: f32 = 0.1;
+const HEIGHT_OFFSET: f32 = 4.0;
 
 pub struct CameraPlugin;
 
@@ -60,7 +61,7 @@ fn update_target_position(
     let direction = flat_delta_position.normalize_or_zero();
 
     let mut new_position = spider.translation + direction * FOLLOW_DISTANCE;
-    new_position.y = camera_transform.translation.y;
+    new_position.y = camera_transform.translation.y + HEIGHT_OFFSET;
 
     camera.target_position = new_position;
 }
