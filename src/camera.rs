@@ -1,4 +1,4 @@
-use bevy::{math::VectorSpace, prelude::*};
+use bevy::prelude::*;
 
 use crate::{rotations, spider::Spider};
 
@@ -61,7 +61,7 @@ fn update_target_position(
     let direction = flat_delta_position.normalize_or_zero();
 
     let mut new_position = spider.translation + direction * FOLLOW_DISTANCE;
-    new_position.y = camera_transform.translation.y + HEIGHT_OFFSET;
+    new_position.y = spider.translation.y + HEIGHT_OFFSET;
 
     camera.target_position = new_position;
 }

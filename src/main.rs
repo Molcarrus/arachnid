@@ -4,8 +4,8 @@ mod leg;
 mod rotations;
 mod spider;
 mod terrain;
-mod world;
 mod ui;
+mod world;
 
 use bevy::prelude::*;
 
@@ -13,6 +13,7 @@ use camera::CameraPlugin;
 use kin::IkPlugin;
 use spider::SpiderPlugin;
 use terrain::TerrainPlugin;
+use ui::UiPlugin;
 use world::WorldPlugin;
 
 fn main() {
@@ -24,6 +25,7 @@ fn main() {
             IkPlugin,
             SpiderPlugin,
             TerrainPlugin,
+            UiPlugin,
         ))
         .run();
 }
