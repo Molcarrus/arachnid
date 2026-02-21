@@ -154,6 +154,7 @@ fn spawn_spider(
                 combined_leg_position_error: 0.0,
                 movement_group: 2,
             },
+            appearance,
             Transform::from_translation(SPAWN_POSITION),
             Mesh3d(mesh),
             MeshMaterial3d(material),
