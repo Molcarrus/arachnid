@@ -15,11 +15,15 @@ impl Plugin for UiPlugin {
                 Update,
                 (
                     toggle_menu,
-                    handle_terrain_buttons,
-                    handle_color_buttons,
-                    handle_shape_buttons,
                     update_ui_visibility,
-                    update_button_highlights,
+                    handle_terrain_buttons,
+                    handle_body_color_buttons,
+                    handle_leg_color_buttons,
+                    handle_shape_buttons,
+                    update_terrain_highlights,
+                    update_shape_highlights,
+                    update_body_color_highlights,
+                    update_leg_color_highlights,
                 ),
             );
     }
@@ -62,15 +66,14 @@ struct ShapeButton {
 #[derive(Component)]
 struct MenuHintText;
 
-const BUTTON_SIZE: Val = Val::Px(40.0);
-const BUTTON_MARGIN: UiRect = UiRect::all(Val::Px(3.0));
+const SWATCH_SIZE: Val = Val::Px(36.0);
 
 fn setup_ui(mut commands: Commands) {
     commands.spawn((
         MenuHintText,
-        Text::new("Press [TAB] for menu"),
+        Text::new("Press [TAB] for menu | RMB drag to orbit | Scroll to zoom | Q/E rotate | R/F tilt"),
         TextFont {
-            font_size: 18.0,
+            font_size: 16.0,
             ..default()
         },
         TextColor(Color::srgba(1.0, 1.0, 1.0, 0.6)),
@@ -87,30 +90,25 @@ fn setup_ui(mut commands: Commands) {
             MenuRoot,
             Node {
                 position_type: PositionType::Absolute,
-                top: Val::Px(35.0),
+                top: Val::Px(40.0),
                 left: Val::Px(10.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(12.0)),
-                row_gap: Val::Px(10.0),
+                padding: UiRect::all(Val::Px(14.0)),
+                row_gap: Val::Px(8.0),
+                min_width: Val::Px(300.0),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.75)),
+            BackgroundColor(Color::srgba(0.05, 0.05, 0.05, 0.85)),
             BorderRadius::all(Val::Px(8.0)),
             Visibility::Hidden,
         ))
         .with_children(|menu| {
-            menu.spawn((
-                Text::new("Terrain"),
-                TextFont {
-                    font_size: 20.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-
+            spawn_section_label(menu, "Terrain");
             menu.spawn(Node {
                 flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(5.0),
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: Val::Px(4.0),
+                row_gap: Val::Px(4.0),
                 ..default()
             })
             .with_children(|row| {
@@ -125,80 +123,61 @@ fn setup_ui(mut commands: Commands) {
                 }
             });
 
-            menu.spawn((
-                Text::new("Body Color"),
-                TextFont {
-                    font_size: 20.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-
+            // === BODY COLOR ===
+            spawn_section_label(menu, "Body Color");
             menu.spawn(Node {
                 flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(5.0),
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: Val::Px(4.0),
+                row_gap: Val::Px(4.0),
                 ..default()
             })
             .with_children(|row| {
                 let colors = [
-                    ("Black", Color::BLACK),
-                    ("Red", Color::srgb(0.8, 0.1, 0.1)),
-                    ("Green", Color::srgb(0.1, 0.6, 0.1)),
-                    ("Blue", Color::srgb(0.1, 0.2, 0.8)),
-                    ("Purple", Color::srgb(0.5, 0.0, 0.7)),
-                    ("Orange", Color::srgb(0.9, 0.5, 0.0)),
-                    ("Brown", Color::srgb(0.4, 0.25, 0.1)),
-                    ("White", Color::srgb(0.9, 0.9, 0.9)),
+                    Color::BLACK,
+                    Color::srgb(0.8, 0.1, 0.1),
+                    Color::srgb(0.1, 0.6, 0.1),
+                    Color::srgb(0.1, 0.2, 0.8),
+                    Color::srgb(0.5, 0.0, 0.7),
+                    Color::srgb(0.9, 0.5, 0.0),
+                    Color::srgb(0.4, 0.25, 0.1),
+                    Color::srgb(0.9, 0.9, 0.9),
                 ];
-
-                for (name, color) in colors {
-                    spawn_color_swatch(row, name, color, BodyColorButton { color });
+                for color in colors {
+                    spawn_color_swatch(row, color, BodyColorButton { color });
                 }
             });
 
-            menu.spawn((
-                Text::new("Leg Color"),
-                TextFont {
-                    font_size: 20.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-
+            spawn_section_label(menu, "Leg Color");
             menu.spawn(Node {
                 flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(5.0),
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: Val::Px(4.0),
+                row_gap: Val::Px(4.0),
                 ..default()
             })
             .with_children(|row| {
                 let colors = [
-                    ("Dark Gray", Color::srgb(0.25, 0.25, 0.25)),
-                    ("Red", Color::srgb(0.6, 0.1, 0.1)),
-                    ("Green", Color::srgb(0.1, 0.5, 0.1)),
-                    ("Blue", Color::srgb(0.1, 0.15, 0.6)),
-                    ("Purple", Color::srgb(0.4, 0.0, 0.5)),
-                    ("Yellow", Color::srgb(0.7, 0.7, 0.0)),
-                    ("Brown", Color::srgb(0.3, 0.2, 0.08)),
-                    ("White", Color::srgb(0.85, 0.85, 0.85)),
+                    Color::srgb(0.25, 0.25, 0.25),
+                    Color::srgb(0.6, 0.1, 0.1),
+                    Color::srgb(0.1, 0.5, 0.1),
+                    Color::srgb(0.1, 0.15, 0.6),
+                    Color::srgb(0.4, 0.0, 0.5),
+                    Color::srgb(0.7, 0.7, 0.0),
+                    Color::srgb(0.3, 0.2, 0.08),
+                    Color::srgb(0.85, 0.85, 0.85),
                 ];
-
-                for (name, color) in colors {
-                    spawn_color_swatch(row, name, color, LegColorButton { color });
+                for color in colors {
+                    spawn_color_swatch(row, color, LegColorButton { color });
                 }
             });
 
-            menu.spawn((
-                Text::new("Body Shape"),
-                TextFont {
-                    font_size: 20.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-
+            spawn_section_label(menu, "Body Shape");
             menu.spawn(Node {
                 flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(5.0),
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: Val::Px(4.0),
+                row_gap: Val::Px(4.0),
                 ..default()
             })
             .with_children(|row| {
@@ -208,7 +187,6 @@ fn setup_ui(mut commands: Commands) {
                     ("Flat", SpiderShapeType::Flat),
                     ("Long", SpiderShapeType::Long),
                 ];
-
                 for (name, shape) in shapes {
                     spawn_text_button(row, name, ShapeButton { shape });
                 }
@@ -216,18 +194,32 @@ fn setup_ui(mut commands: Commands) {
         });
 }
 
+fn spawn_section_label(parent: &mut ChildSpawnerCommands, text: &str) {
+    parent.spawn((
+        Text::new(text.to_string()),
+        TextFont {
+            font_size: 18.0,
+            ..default()
+        },
+        TextColor(Color::srgb(0.9, 0.9, 0.5)),
+    ));
+}
+
 fn spawn_text_button(parent: &mut ChildSpawnerCommands, text: &str, marker: impl Component) {
     parent
         .spawn((
             marker,
             Button,
+            Interaction::None,
             Node {
-                padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.25, 0.25, 0.25)),
+            BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+            BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.15)),
             BorderRadius::all(Val::Px(4.0)),
         ))
         .with_children(|btn| {
@@ -244,22 +236,21 @@ fn spawn_text_button(parent: &mut ChildSpawnerCommands, text: &str, marker: impl
 
 fn spawn_color_swatch(
     parent: &mut ChildSpawnerCommands,
-    _name: &str,
     color: Color,
     marker: impl Component,
 ) {
     parent.spawn((
         marker,
         Button,
+        Interaction::None,
         Node {
-            width: BUTTON_SIZE,
-            height: BUTTON_SIZE,
-            border: UiRect::all(Val::Px(2.0)),
-            margin: BUTTON_MARGIN,
+            width: SWATCH_SIZE,
+            height: SWATCH_SIZE,
+            border: UiRect::all(Val::Px(3.0)),
             ..default()
         },
         BackgroundColor(color),
-        BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.3)),
+        BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.2)),
         BorderRadius::all(Val::Px(4.0)),
     ));
 }
@@ -287,21 +278,20 @@ fn handle_terrain_buttons(
     interactions: Query<(&Interaction, &TerrainButton), Changed<Interaction>>,
     mut terrain_events: EventWriter<TerrainChangeEvent>,
 ) {
-    for (interaction, terrain_btn) in interactions.iter() {
+    for (interaction, btn) in interactions.iter() {
         if *interaction == Interaction::Pressed {
-            terrain_events.write(TerrainChangeEvent {
-                new_terrain: terrain_btn.terrain_type,
+            terrain_events.send(TerrainChangeEvent {
+                new_terrain: btn.terrain_type,
             });
         }
     }
 }
 
-fn handle_color_buttons(
-    body_interactions: Query<(&Interaction, &BodyColorButton), Changed<Interaction>>,
-    leg_interactions: Query<(&Interaction, &LegColorButton), Changed<Interaction>>,
+fn handle_body_color_buttons(
+    interactions: Query<(&Interaction, &BodyColorButton), Changed<Interaction>>,
     mut spider: Query<&mut SpiderAppearance, With<Spider>>,
 ) {
-    for (interaction, btn) in body_interactions.iter() {
+    for (interaction, btn) in interactions.iter() {
         if *interaction == Interaction::Pressed {
             if let Ok(mut appearance) = spider.single_mut() {
                 appearance.color_config.body_color = btn.color;
@@ -309,8 +299,13 @@ fn handle_color_buttons(
             }
         }
     }
+}
 
-    for (interaction, btn) in leg_interactions.iter() {
+fn handle_leg_color_buttons(
+    interactions: Query<(&Interaction, &LegColorButton), Changed<Interaction>>,
+    mut spider: Query<&mut SpiderAppearance, With<Spider>>,
+) {
+    for (interaction, btn) in interactions.iter() {
         if *interaction == Interaction::Pressed {
             if let Ok(mut appearance) = spider.single_mut() {
                 appearance.color_config.leg_color = btn.color;
@@ -334,30 +329,68 @@ fn handle_shape_buttons(
     }
 }
 
-fn update_button_highlights(
-    mut terrain_buttons: Query<(&TerrainButton, &mut BorderColor)>,
-    mut shape_buttons: Query<(&ShapeButton, &mut BorderColor), Without<TerrainButton>>,
+fn update_terrain_highlights(
+    mut buttons: Query<(&TerrainButton, &mut BorderColor)>,
     current_terrain: Res<CurrentTerrain>,
-    spider: Query<&SpiderAppearance, With<Spider>>,
 ) {
-    let active_border = BorderColor(Color::srgb(1.0, 1.0, 0.0));
-    let inactive_border = BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.15));
-
-    for (btn, mut border) in terrain_buttons.iter_mut() {
+    for (btn, mut border) in buttons.iter_mut() {
         *border = if btn.terrain_type == current_terrain.terrain_type {
-            active_border
+            BorderColor(Color::srgb(1.0, 1.0, 0.0))
         } else {
-            inactive_border
+            BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.15))
         };
     }
+}
 
+fn update_shape_highlights(
+    mut buttons: Query<(&ShapeButton, &mut BorderColor)>,
+    spider: Query<&SpiderAppearance, With<Spider>>,
+) {
     if let Ok(appearance) = spider.single() {
-        for (btn, mut border) in shape_buttons.iter_mut() {
+        for (btn, mut border) in buttons.iter_mut() {
             *border = if btn.shape == appearance.shape {
-                active_border
+                BorderColor(Color::srgb(1.0, 1.0, 0.0))
             } else {
-                inactive_border
+                BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.15))
             };
         }
     }
+}
+
+fn update_body_color_highlights(
+    mut buttons: Query<(&BodyColorButton, &mut BorderColor)>,
+    spider: Query<&SpiderAppearance, With<Spider>>,
+) {
+    if let Ok(appearance) = spider.single() {
+        for (btn, mut border) in buttons.iter_mut() {
+            *border = if colors_match(btn.color, appearance.color_config.body_color) {
+                BorderColor(Color::srgb(1.0, 1.0, 0.0))
+            } else {
+                BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.2))
+            };
+        }
+    }
+}
+
+fn update_leg_color_highlights(
+    mut buttons: Query<(&LegColorButton, &mut BorderColor)>,
+    spider: Query<&SpiderAppearance, With<Spider>>,
+) {
+    if let Ok(appearance) = spider.single() {
+        for (btn, mut border) in buttons.iter_mut() {
+            *border = if colors_match(btn.color, appearance.color_config.leg_color) {
+                BorderColor(Color::srgb(1.0, 1.0, 0.0))
+            } else {
+                BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.2))
+            };
+        }
+    }
+}
+
+fn colors_match(a: Color, b: Color) -> bool {
+    let a = a.to_srgba();
+    let b = b.to_srgba();
+    (a.red - b.red).abs() < 0.01
+        && (a.green - b.green).abs() < 0.01
+        && (a.blue - b.blue).abs() < 0.01
 }

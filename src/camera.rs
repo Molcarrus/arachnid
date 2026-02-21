@@ -1,6 +1,6 @@
-use bevy::prelude::*;
+use bevy::{input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel}, prelude::*};
 
-use crate::{rotations, spider::Spider};
+use crate::{rotations::{self, looking_at}, spider::Spider};
 
 const FOLLOW_DISTANCE: f32 = 10.0;
 const SPAWN_POSITION: Vec3 = Vec3::new(0.0, 6.0, 10.0);
@@ -9,6 +9,17 @@ const MOVE_LERP_VALUE: f32 = 0.05;
 const ROTATE_LERP_VALUE: f32 = 0.1;
 const HEIGHT_OFFSET: f32 = 4.0;
 
+const MIN_DISTANCE: f32 = 4.0;
+const MAX_DISTANCE: f32 = 30.0;
+const DEFAULT_DISTANCE: f32 = 10.0;
+
+const MIN_PITCH: f32 = -0.3;
+const MAX_PITCH: f32 = 1.4;
+
+const ORBIT_SENSITIVITY: f32 = 0.005;
+const ZOOM_SENSITIVITY: f32 = 1.0;
+const ZOOM_LETP: f32 = 0.1;
+
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
@@ -16,8 +27,9 @@ impl Plugin for CameraPlugin {
         app.add_systems(Startup, spawn_camera).add_systems(
             Update,
             (
-                (update_target_position, update_target_rotation),
-                (move_towards_spider, rotate_towards_spider),
+                handle_camera_input,
+                update_target_transform,
+                apply_camera_lerp,
             )
                 .chain(),
         );
@@ -26,15 +38,23 @@ impl Plugin for CameraPlugin {
 
 #[derive(Component)]
 struct SpiderCamera {
+    yaw: f32,
+    pitch: f32,
+    distance: f32,
+    target_distance: f32,
     target_position: Vec3,
     target_rotation: Quat,
 }
 
 impl SpiderCamera {
-    fn new(position: Vec3, rotation: Quat) -> Self {
+    fn new() -> Self {
         SpiderCamera {
-            target_position: position,
-            target_rotation: rotation,
+            yaw: 0.0,
+            pitch: 0.5,
+            distance: DEFAULT_DISTANCE,
+            target_distance: DEFAULT_DISTANCE,
+            target_position: SPAWN_POSITION,
+            target_rotation: Quat::IDENTITY,
         }
     }
 }
@@ -45,65 +65,79 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_translation(SPAWN_POSITION).with_rotation(spawn_rotation),
-        SpiderCamera::new(SPAWN_POSITION, spawn_rotation),
+        SpiderCamera::new(),
     ));
 }
 
-fn update_target_position(
-    mut spider_camera: Query<(&mut SpiderCamera, &Transform)>,
-    spider: Query<&Transform, (With<Spider>, Without<SpiderCamera>)>,
+fn handle_camera_input(
+    mut camera: Query<&mut SpiderCamera>,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    mut mouse_motion: EventReader<MouseMotion>,
+    mut scroll_events: EventReader<MouseWheel>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
 ) {
-    let (mut camera, camera_transform) = spider_camera.single_mut().unwrap();
-    let spider = spider.single().unwrap();
-
-    let flat_delta_position =
-        get_flat_delta_position(spider.translation, camera_transform.translation);
-    let direction = flat_delta_position.normalize_or_zero();
-
-    let mut new_position = spider.translation + direction * FOLLOW_DISTANCE;
-    new_position.y = spider.translation.y + HEIGHT_OFFSET;
-
-    camera.target_position = new_position;
-}
-
-fn update_target_rotation(
-    mut spider_camera: Query<(&mut SpiderCamera, &Transform)>,
-    spider: Query<&Transform, (With<Spider>, Without<SpiderCamera>)>,
-) {
-    let (mut camera, camera_transform) = spider_camera.single_mut().unwrap();
-    let spider = spider.single().unwrap();
-
-    let target_rotation =
-        rotations::looking_at(camera_transform.translation, spider.translation, Vec3::Y);
-    camera.target_rotation = target_rotation;
-}
-
-fn move_towards_spider(mut spider_camera: Query<(&SpiderCamera, &mut Transform)>) {
-    let (camera, mut camera_transform) = spider_camera.single_mut().unwrap();
-
-    let current_pos = camera_transform.translation;
-    let target_pos = camera.target_position;
-
-    camera_transform.translation = current_pos.lerp(target_pos, MOVE_LERP_VALUE);
-}
-
-fn rotate_towards_spider(mut spider_camera: Query<(&mut Transform, &SpiderCamera)>) {
-    let (mut camera_transform, camera) = spider_camera.single_mut().unwrap();
-
-    let current_rotation = camera_transform.rotation;
-    let target_rotation = camera.target_rotation;
-
-    camera_transform.rotation = current_rotation.slerp(target_rotation, ROTATE_LERP_VALUE);
-}
-
-fn get_flat_delta_position(from: Vec3, to: Vec3) -> Vec3 {
-    flatten_vector(to) - flatten_vector(from)
-}
-
-fn flatten_vector(vector: Vec3) -> Vec3 {
-    Vec3 {
-        x: vector.x,
-        y: 0.0,
-        z: vector.z,
+    let mut cam = camera.single_mut().unwrap();
+    
+    if mouse_button.pressed(MouseButton::Right) {
+        for event in mouse_motion.read() {
+            cam.yaw -= event.delta.x * ORBIT_SENSITIVITY;
+            cam.pitch += event.delta.y * ORBIT_SENSITIVITY;
+            cam.pitch = cam.pitch.clamp(MIN_PITCH, MAX_PITCH);
+        }
+    } else {
+        mouse_motion.read();
     }
+    
+    let keyboard_orbit_speed = 2.0;
+    if keyboard.pressed(KeyCode::KeyQ) {
+        cam.yaw += keyboard_orbit_speed * time.delta_secs();
+    }
+    if keyboard.pressed(KeyCode::KeyE) {
+        cam.yaw -= keyboard_orbit_speed * time.delta_secs();
+    }
+    
+    if keyboard.pressed(KeyCode::KeyR) {
+        cam.pitch = (cam.pitch - keyboard_orbit_speed * time.delta_secs()).clamp(MIN_PITCH, MAX_PITCH);
+    }
+    if keyboard.pressed(KeyCode::KeyF) {
+        cam.pitch = (cam.pitch + keyboard_orbit_speed * time.delta_secs()).clamp(MIN_PITCH, MAX_PITCH);
+    }
+    
+    for event in scroll_events.read() {
+        let scroll_amount = match event.unit {
+            MouseScrollUnit::Line => event.y * ZOOM_SENSITIVITY,
+            MouseScrollUnit::Pixel => event.y * ZOOM_SENSITIVITY * 0.01,
+        };
+        cam.target_distance = (cam.target_distance - scroll_amount).clamp(MIN_DISTANCE, MAX_DISTANCE);
+    }
+    
+    cam.distance = cam.distance + (cam.target_distance - cam.distance) * ZOOM_LETP;
+}
+
+fn update_target_transform(
+    mut camera: Query<&mut SpiderCamera>,
+    spider: Query<&Transform, (With<Spider>, Without<SpiderCamera>)>
+) {
+    let mut cam = camera.single_mut().unwrap();
+    let spider_transform = spider.single().unwrap();
+    let spider_pos = spider_transform.translation;
+    
+    let offset = Vec3::new(
+        cam.yaw.cos() * cam.pitch.cos() * cam.distance, 
+        cam.pitch.sin() * cam.distance, 
+        cam.yaw.sin() * cam.pitch.cos() * cam.distance
+    );
+    
+    cam.target_position = spider_pos + offset;
+    cam.target_rotation = looking_at(cam.target_position, spider_pos, Vec3::Y);
+}
+
+fn apply_camera_lerp(
+    mut camera: Query<(&SpiderCamera, &mut Transform)>
+) {
+    let (cam, mut transform) = camera.single_mut().unwrap();
+    
+    transform.translation = transform.translation.lerp(cam.target_position, MOVE_LERP_VALUE);
+    transform.rotation = transform.rotation.slerp(cam.target_rotation, ROTATE_LERP_VALUE);
 }
